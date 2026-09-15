@@ -7,15 +7,15 @@ The tool reads files locally and does not modify or upload them. It uses the Bam
 ## Usage
 
 ```sh
-uv run filament-list.py --project '/path/to/project.3mf'
+uv run bambu-filament-list --project '/path/to/project.3mf'
 ```
 
 Choose an output format and redirect it to a file:
 
 ```sh
-uv run filament-list.py --project '/path/to/project.3mf' --format json > filaments.json
-uv run filament-list.py --project '/path/to/project.3mf' --format csv > filaments.csv
-uv run filament-list.py --project '/path/to/project.3mf' --format html > filaments.html
+uv run bambu-filament-list --project '/path/to/project.3mf' --format json > filaments.json
+uv run bambu-filament-list --project '/path/to/project.3mf' --format csv > filaments.csv
+uv run bambu-filament-list --project '/path/to/project.3mf' --format html > filaments.html
 open filaments.html
 ```
 
