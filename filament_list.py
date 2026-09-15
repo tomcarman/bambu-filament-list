@@ -8,7 +8,10 @@ import re
 import sys
 import zipfile
 from pathlib import Path
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+from html.parser import HTMLParser
 
 DEFAULT_CATALOG = Path('/Applications/BambuStudio.app/Contents/Resources/profiles/BBL/filament/filaments_color_codes.json')
 FIELDS = ['slot', 'profile', 'material', 'vendor', 'hex', 'colour_name', 'product_code', 'match', 'filament_id', 'store_url']
@@ -25,15 +28,89 @@ def rgba(value):
         return value + 'FF'
     return value
 
-def bambu_store_url(profile, vendor, match, store_base):
-    """Return a regional Bambu Store URL for an exact Bambu catalogue match."""
-    if vendor != 'Bambu Lab' or match != 'exact catalogue match':
-        return ''
-    filament = profile.removeprefix('Bambu ').split(' @', 1)[0]
-    path = STORE_PRODUCTS.get(filament)
-    if path:
-        return f'{store_base.rstrip("/")}{path}'
-    return f'{store_base.rstrip("/")}/search?q={quote_plus(f"Bambu {filament}")}'
+class ProductDataParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.active = False
+        self.parts = []
+        self.documents = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'script':
+            self.active = dict(attrs).get('type') == 'application/ld+json'
+            self.parts = []
+
+    def handle_data(self, data):
+        if self.active:
+            self.parts.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == 'script' and self.active:
+            self.active = False
+            try:
+                self.documents.append(json.loads(''.join(self.parts)))
+            except ValueError:
+                pass
+
+
+def variant_links(page, product_url, store_type):
+    """Read exact colour/type variants from the store's structured product data."""
+    parser = ProductDataParser()
+    parser.feed(page)
+    candidates = {}
+    wanted_type = 'Refill' if store_type == 'refill' else 'Filament with spool'
+    def visit(value):
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+        elif isinstance(value, dict):
+            if value.get('@type') == 'Product':
+                name = value.get('name', '')
+                code = re.search(r'\((\d{5})\)', name)
+                options = [part.strip() for part in name.split('/')]
+                offers = value.get('offers', [])
+                if isinstance(offers, dict):
+                    offers = [offers]
+                for offer in offers:
+                    url = offer.get('url', '')
+                    actual, expected = urlsplit(url), urlsplit(product_url)
+                    if (code and wanted_type in options and '1 kg' in options
+                            and actual.scheme == 'https' and actual.netloc == expected.netloc
+                            and actual.path == expected.path and re.fullmatch(r'id=\d+', actual.query)):
+                        candidates.setdefault(code.group(1), set()).add(url)
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    visit(child)
+    visit(parser.documents)
+    return {code: next(iter(urls)) for code, urls in candidates.items() if len(urls) == 1}
+
+
+def fetch_variant_links(product_url, store_type):
+    request = Request(product_url, headers={'User-Agent': 'bambu-filament-list/0.1'})
+    with urlopen(request, timeout=15) as response:
+        page = response.read(8_000_001)
+    if len(page) > 8_000_000:
+        raise ValueError('Store page exceeds size limit')
+    return variant_links(page.decode('utf-8'), product_url, store_type)
+
+
+def add_store_links(rows, store_base, store_type, loader=fetch_variant_links):
+    cache = {}
+    for row in rows:
+        if row['vendor'] != 'Bambu Lab' or row['match'] != 'exact catalogue match':
+            continue
+        family = row['profile'].removeprefix('Bambu ').split(' @', 1)[0]
+        path = STORE_PRODUCTS.get(family)
+        if not path:
+            continue
+        product_url = store_base.rstrip('/') + path
+        if product_url not in cache:
+            try:
+                cache[product_url] = loader(product_url, store_type)
+            except (OSError, URLError, ValueError) as error:
+                print(f'Could not resolve store variants for {family}: {error}', file=sys.stderr)
+                cache[product_url] = {}
+        row['store_url'] = cache[product_url].get(row['product_code'], '')
 
 
 def validate_store_base(value):
@@ -43,7 +120,7 @@ def validate_store_base(value):
     return value
 
 
-def extract(project, catalog, store_base=DEFAULT_STORE):
+def extract(project, catalog):
     with zipfile.ZipFile(project) as archive:
         info = archive.getinfo('Metadata/project_settings.config')
         if info.file_size > 20_000_000:
@@ -75,7 +152,7 @@ def extract(project, catalog, store_base=DEFAULT_STORE):
         rows.append(dict(zip(FIELDS, [i + 1, profile,
             at('filament_type', i), vendor, colour,
             ' / '.join(x[0] for x in identities), ' / '.join(x[1] for x in identities),
-            match, fid, bambu_store_url(profile, vendor, match, store_base)])))
+            match, fid, ''])))
     return rows
 
 def render_html(rows, project_name):
@@ -149,6 +226,10 @@ def main():
                         help='Bambu filaments_color_codes.json; defaults to installed macOS app')
     parser.add_argument('--store-base', default=DEFAULT_STORE,
                         help='regional Bambu Store base URL (default: UK store)')
+    parser.add_argument('--store-type', choices=['refill', 'spool'], default='refill',
+                        help='exact 1 kg store variant to link (default: refill)')
+    parser.add_argument('--no-store-links', action='store_true',
+                        help='skip online store lookups for fully offline extraction')
     args = parser.parse_args()
     try:
         if args.catalog.is_file():
@@ -156,7 +237,10 @@ def main():
         else:
             print('Colour catalogue unavailable; names remain unresolved. Use --catalog PATH.', file=sys.stderr)
             catalog = []
-        rows = extract(args.project, catalog, validate_store_base(args.store_base))
+        store_base = validate_store_base(args.store_base)
+        rows = extract(args.project, catalog)
+        if not args.no_store_links:
+            add_store_links(rows, store_base, args.store_type)
         if args.format == 'json':
             print(json.dumps(rows, indent=2, ensure_ascii=False))
         elif args.format == 'html':

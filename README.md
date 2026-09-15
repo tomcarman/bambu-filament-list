@@ -2,7 +2,7 @@
 
 Extract the configured filament slots from a Bambu Studio `.3mf` project. It reports material profiles, exact colour values, Bambu colour names and product codes, plus regional Bambu Store links for exact catalogue matches.
 
-The tool reads files locally and does not modify or upload them. It uses the Bambu colour catalogue bundled with Bambu Studio on macOS and has no third-party Python dependencies.
+The tool reads files locally and does not modify or upload them. It uses the Bambu colour catalogue bundled with Bambu Studio on macOS and has no third-party Python dependencies. To resolve exact store links, it reads public product pages from the selected regional store (once per product family per run). Use `--no-store-links` for fully offline extraction.
 
 ## Usage
 
@@ -20,6 +20,8 @@ open filaments.html
 ```
 
 The UK Bambu Store is used by default. Select another regional store with `--store-base`, such as `https://us.store.bambulab.com`. On systems where Bambu Studio is installed elsewhere, pass its `filaments_color_codes.json` using `--catalog`.
+
+Store links select the exact colour, **Refill / 1 kg** by default. Use `--store-type spool` for **Filament with spool / 1 kg**. PLA Basic and PLA Matte are currently supported. If the requested variant is missing, ambiguous, unsupported, or the store cannot be reached, the link stays blank; the filament list still works. A link does not guarantee stock availability.
 
 ## Examples
 
