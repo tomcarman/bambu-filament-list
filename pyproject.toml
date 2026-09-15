@@ -1,0 +1,8 @@
+[project]
+name = "bambu-filament-list"
+version = "0.1.0"
+description = "Extract filament colours and types from Bambu Studio 3MF projects"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+

@@ -1,0 +1,38 @@
+[
+  {
+    "slot": 1,
+    "profile": "Bambu PLA Basic @BBL X1C",
+    "material": "PLA",
+    "vendor": "Bambu Lab",
+    "hex": "#C12E1F",
+    "colour_name": "Red",
+    "product_code": "10200",
+    "match": "exact catalogue match",
+    "filament_id": "GFA00",
+    "store_url": "https://uk.store.bambulab.com/products/pla-basic-filament"
+  },
+  {
+    "slot": 2,
+    "profile": "Bambu PLA Matte @BBL X1C",
+    "material": "PLA",
+    "vendor": "Bambu Lab",
+    "hex": "#A3D8E1",
+    "colour_name": "Ice Blue",
+    "product_code": "11601",
+    "match": "exact catalogue match",
+    "filament_id": "GFA01",
+    "store_url": "https://uk.store.bambulab.com/products/pla-matte"
+  },
+  {
+    "slot": 3,
+    "profile": "Generic PETG @BBL X1C",
+    "material": "PETG",
+    "vendor": "Generic",
+    "hex": "#12AB34",
+    "colour_name": "",
+    "product_code": "",
+    "match": "unresolved",
+    "filament_id": "GFG99",
+    "store_url": ""
+  }
+]

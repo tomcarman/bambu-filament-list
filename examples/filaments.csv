@@ -1,0 +1,4 @@
+slot,profile,material,vendor,hex,colour_name,product_code,match,filament_id,store_url
+1,Bambu PLA Basic @BBL X1C,PLA,Bambu Lab,#C12E1F,Red,10200,exact catalogue match,GFA00,https://uk.store.bambulab.com/products/pla-basic-filament
+2,Bambu PLA Matte @BBL X1C,PLA,Bambu Lab,#A3D8E1,Ice Blue,11601,exact catalogue match,GFA01,https://uk.store.bambulab.com/products/pla-matte
+3,Generic PETG @BBL X1C,PETG,Generic,#12AB34,,,unresolved,GFG99,
